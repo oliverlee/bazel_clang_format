@@ -1,0 +1,37 @@
+local_repository(
+    name = "bazel_clang_format",
+    path = "../..",
+)
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+BAZEL_TOOLCHAIN_COMMIT = "66f938c956d247d01997ecfc84725f165ceaf1ed"
+
+BAZEL_TOOLCHAIN_SHA = None
+
+http_archive(
+    name = "com_grail_bazel_toolchain",
+    sha256 = BAZEL_TOOLCHAIN_SHA,
+    strip_prefix = "bazel-toolchain-{commit}".format(
+        commit = BAZEL_TOOLCHAIN_COMMIT,
+    ),
+    url = "https://github.com/oliverlee/bazel-toolchain/archive/{commit}.tar.gz".format(
+        commit = BAZEL_TOOLCHAIN_COMMIT,
+    ),
+)
+
+load("@com_grail_bazel_toolchain//toolchain:deps.bzl", "bazel_toolchain_dependencies")
+
+bazel_toolchain_dependencies()
+
+load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
+
+llvm_toolchain(
+    name = "llvm14",
+    llvm_version = "14.0.0",
+)
+
+load("@llvm14//:toolchains.bzl", "llvm_register_toolchains")
+
+llvm_register_toolchains()
+

@@ -1,0 +1,9 @@
+cc_binary(
+    name = "main",
+    srcs = ["main.cpp"],
+)
+
+filegroup(
+    name = "clang_format_config",
+    srcs = [".clang-format"],
+)

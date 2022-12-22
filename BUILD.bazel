@@ -1,0 +1,31 @@
+package(default_visibility = ["//visibility:public"])
+
+# Your binary should be a `*_binary`, *NOT* filegroup
+filegroup(
+    name = "default_binary",
+    srcs = [],
+)
+
+label_flag(
+    name = "binary",
+    build_setting_default = ":default_binary",
+)
+
+filegroup(
+    name = "default_config",
+    srcs = [".clang-format"],
+)
+
+label_flag(
+    name = "config",
+    build_setting_default = ":default_config",
+)
+
+sh_binary(
+    name = "wrapper",
+    srcs = ["wrapper.sh"],
+    data = [
+        ":binary",
+        ":config",
+    ],
+)
