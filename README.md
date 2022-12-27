@@ -93,6 +93,23 @@ then run:
 bazel build //... --config clang-format
 ```
 
+To format all source files:
+
+```sh
+bazel run @bazel_clang_format//:update \
+  --@bazel_clang_format//:binary=@llvm15//:clang_format \
+  --@bazel_clang_format//:config=//:clang_format_config
+```
+
+with a specific binary/config if desired.
+
+Or to format specific targets:
+
+```sh
+bazel run @bazel_clang_format//:update -- //src/...
+```
+
+
 ## Requirements
 
 - Bazel ???
