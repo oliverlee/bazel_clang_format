@@ -24,8 +24,4 @@ label_flag(
 sh_binary(
     name = "wrapper",
     srcs = ["wrapper.sh"],
-    data = [
-        ":binary",
-        ":config",
-    ],
 )

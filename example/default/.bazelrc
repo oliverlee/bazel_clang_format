@@ -1,2 +1,2 @@
- build:clang-format --aspects @bazel_clang_format//:clang_format.bzl%clang_format_aspect
+ build:clang-format --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect
  build:clang-format --output_groups=report

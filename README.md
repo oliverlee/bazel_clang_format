@@ -31,7 +31,7 @@ the following command:
 
 ```
 bazel build //... \
-  --aspects @bazel_clang_format//:clang_format.bzl%clang_format_aspect \
+  --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect \
   --output_groups=report
 ```
 
@@ -51,7 +51,7 @@ and override the default config file using the config setting:
 
 ```sh
 bazel build //... \
-  --aspects @bazel_clang_format//:clang_format.bzl%clang_format_aspect \
+  --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect \
   --@bazel_clang_format//:config=//:clang_format_config \ # <-----------
   --output_groups=report
 ```
@@ -62,7 +62,7 @@ binary setting:
 
 ```sh
 bazel build //... \
-  --aspects @bazel_clang_format//:clang_format.bzl%clang_format_aspect \
+  --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect \
   --@bazel_clang_format//:binary=@llvm15//:clang-format \ # <-----------
   --output_groups=report
 ```
@@ -74,14 +74,14 @@ Config shorthand:
 
 ```
 # //.bazelrc
-build:clang-format --aspects @bazel_clang_format//:clang_format.bzl%clang_format_aspect
+build:clang-format --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect
 build:clang-format --output_groups=report
 ```
 or with configuration:
 
 ```
 # //.bazelrc
-build:clang-format --aspects @bazel_clang_format//:clang_format.bzl%clang_format_aspect
+build:clang-format --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect
 build:clang-format --@bazel_clang_format//:binary=@llvm15//:clang-format
 build:clang-format --@bazel_clang_format//:config=//:clang_format_config
 build:clang-format --output_groups=report
