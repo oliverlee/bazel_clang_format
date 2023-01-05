@@ -4,7 +4,7 @@ Run clang-format on Bazel C++ targets directly. It's like
 [bazel_clang_tidy](https://github.com/erenon/bazel_clang_tidy) but for
 clang-format.
 
-Usage:
+## usage
 
 ```py
 # //:WORKSPACE.bazel
@@ -109,6 +109,47 @@ Or to format specific targets:
 bazel run @bazel_clang_format//:update -- //src/...
 ```
 
+## defaults without .bazelrc
+
+Both the aspect and update rule can be defined locally to bake in a default
+binary or config.
+
+```python
+# //:BUILD.bazel
+load("@bazel_clang_format//:defs.bzl", "clang_format_update")
+
+alias(
+    name = "default_clang_format_binary",
+    actual = "@llvm_toolchain//:clang-format",
+)
+
+filegroup(
+    name = "default_clang_format_config",
+    srcs = [".clang-format"]
+    visibility = ["//visibility:public"],
+)
+
+clang_format_update(
+    name = "clang_format",
+    binary = ":default_clang_format_binary",
+    config = ":default_clang_format_config",
+)
+```
+
+```python
+# //:aspects.bzl
+load("@bazel_clang_format//:defs.bzl", "make_clang_format_aspect")
+
+clang_format = make_clang_format_aspect(
+    binary = "//:default_clang_format_binary",
+    config = "//:default_clang_format_config",
+)
+```
+
+```sh
+bazel run //:clang_format
+bazel build //... --aspects //:aspects.bzl%clang_format --output_groups=report
+```
 
 ## Requirements
 

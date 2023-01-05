@@ -74,37 +74,43 @@ def _clang_format_aspect_impl(target, ctx):
 
     return [OutputGroupInfo(report = depset(outputs))]
 
-clang_format_aspect = aspect(
-    implementation = _clang_format_aspect_impl,
-    fragments = ["cpp"],
-    attrs = {
-        "_wrapper": attr.label(default = Label("//:wrapper")),
-        "_binary": attr.label(default = Label("//:binary")),
-        "_config": attr.label(default = Label("//:config")),
-        "_dry_run": attr.label(default = Label("//:dry_run")),
-    },
-    required_providers = [CcInfo],
-    toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
-)
+def make_clang_format_aspect(binary = None, config = None):
+    return aspect(
+        implementation = _clang_format_aspect_impl,
+        fragments = ["cpp"],
+        attrs = {
+            "_wrapper": attr.label(default = Label("//:wrapper")),
+            "_binary": attr.label(default = Label(binary or "//:binary")),
+            "_config": attr.label(default = Label(config or "//:config")),
+            "_dry_run": attr.label(default = Label("//:dry_run")),
+        },
+        required_providers = [CcInfo],
+        toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+    )
+
+clang_format_aspect = make_clang_format_aspect()
 
 def _clang_format_update_impl(ctx):
     update_format = ctx.actions.declare_file(
-        "{}.clang_format.sh".format(ctx.attr.name),
+        "bazel_clang_format.{}.sh".format(ctx.attr.name),
     )
 
     bindir = update_format.path[:update_format.path.find("bin/")] + "bin/"
 
-    config = ctx.attr._config.files.to_list()
-    if len(config) != 1:
-        fail(":config ({}) must contain a single file".format(config))
+    binary = ctx.attr.binary or ctx.attr._binary
+    config = ctx.attr.config or ctx.attr._config
+
+    # get the workspace of bazel_clang_format, not where this update rule is
+    # defined
+    workspace = ctx.attr._template.label.workspace_name
 
     ctx.actions.expand_template(
         template = ctx.attr._template.files.to_list()[0],
         output = update_format,
         substitutions = {
-            "@BINARY@": str(ctx.attr._binary.label),
-            "@CONFIG@": str(ctx.attr._config.label),
-            "@WORKSPACE@": ctx.label.workspace_name,
+            "@BINARY@": str(binary.label),
+            "@CONFIG@": str(config.label),
+            "@WORKSPACE@": workspace,
             "@BINDIR@": bindir,
         },
     )
@@ -124,7 +130,17 @@ clang_format_update = rule(
     attrs = {
         "_template": attr.label(default = Label("//:template")),
         "_binary": attr.label(default = Label("//:binary")),
-        "_config": attr.label(default = Label("//:config")),
+        "_config": attr.label(
+            allow_single_file = True,
+            default = Label("//:config"),
+        ),
+        "binary": attr.label(
+            doc = "Set clang-format binary to use. Overrides //:binary",
+        ),
+        "config": attr.label(
+            allow_single_file = True,
+            doc = "Set clang-format config to use. Overrides //:config",
+        ),
     },
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     executable = True,
