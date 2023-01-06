@@ -115,6 +115,12 @@ def _clang_format_update_impl(ctx):
         },
     )
 
+    format_bin = binary.files_to_run.executable
+    runfiles = ctx.runfiles(
+        ([format_bin] if format_bin else []) +
+        config.files.to_list(),
+    )
+
     # TODO set dependency on wrapper runfiles tree
     # see
     # https://github.com/bazelbuild/bazel/issues/1516
@@ -122,6 +128,7 @@ def _clang_format_update_impl(ctx):
 
     return [DefaultInfo(
         executable = update_format,
+        runfiles = runfiles,
     )]
 
 clang_format_update = rule(
