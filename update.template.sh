@@ -76,12 +76,17 @@ header_file_count=$(echo "$header_files" | sed '/^\s*$/d' | wc -l)
 [[ $header_file_count -eq 0 ]] || "${bazel_format[@]}" --@@WORKSPACE@//:dry_run=False $header_libs
 
 for arg in $(echo "$files" "$header_files"); do
+    generated="@BINDIR@${arg}.clang_format"
+    if [[ ! -f "$generated" ]]; then
+        continue
+    fi
+
     # fix file mode bits
     # https://github.com/bazelbuild/bazel/issues/2888
-    chmod $(stat -c "%a" "$arg") "@BINDIR@${arg}.clang_format"
+    chmod $(stat -c "%a" "$arg") "$generated"
 
     # replace source with formatted version
-    mv "@BINDIR@${arg}.clang_format" "$arg"
+    mv "$generated" "$arg"
 done
 
 # run format check to cache success
