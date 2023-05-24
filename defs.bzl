@@ -33,13 +33,8 @@ def _source_files_in(ctx, attr):
     return [f for f in files if f.is_source]
 
 def _check_format(ctx, package, f):
-    wrapper = ctx.attr._wrapper.files_to_run
     binary = ctx.attr._binary.files_to_run.executable
-    config = ctx.attr._config.files.to_list()
     dry_run = ctx.attr._dry_run[BuildSettingInfo].value
-
-    if len(config) != 1:
-        fail(":config {} must contain a single file.".format(config))
 
     out = ctx.actions.declare_file(
         "{name}.clang_format".format(
@@ -49,12 +44,12 @@ def _check_format(ctx, package, f):
     )
 
     ctx.actions.run(
-        inputs = config + ([binary] if binary else []) + [f],
+        inputs = [ctx.file._config] + ([binary] if binary else []) + [f],
         outputs = [out],
-        executable = wrapper,
+        executable = ctx.executable._wrapper,
         arguments = [
             binary.path if binary else "clang-format",
-            config[0].path,
+            ctx.file._config.path,
             f.path,
             out.path,
         ] + (["--dry-run"] if dry_run else [""]),
@@ -79,9 +74,19 @@ def make_clang_format_aspect(binary = None, config = None):
         implementation = _clang_format_aspect_impl,
         fragments = ["cpp"],
         attrs = {
-            "_wrapper": attr.label(default = Label("//:wrapper")),
-            "_binary": attr.label(default = Label(binary or "//:binary")),
-            "_config": attr.label(default = Label(config or "//:config")),
+            "_wrapper": attr.label(
+                executable = True,
+                cfg = "exec",
+                allow_files = True,
+                default = Label("//:wrapper"),
+            ),
+            "_binary": attr.label(
+                default = Label(binary or "//:binary"),
+            ),
+            "_config": attr.label(
+                default = Label(config or "//:config"),
+                allow_single_file = True,
+            ),
             "_dry_run": attr.label(default = Label("//:dry_run")),
         },
         required_providers = [CcInfo],
@@ -120,11 +125,6 @@ def _clang_format_update_impl(ctx):
         ([format_bin] if format_bin else []) +
         config.files.to_list(),
     )
-
-    # TODO set dependency on wrapper runfiles tree
-    # see
-    # https://github.com/bazelbuild/bazel/issues/1516
-    # https://stackoverflow.com/questions/48178323/during-bazel-build-when-is-target-runfiles-directory-properly-set-up
 
     return [DefaultInfo(
         executable = update_format,

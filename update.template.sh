@@ -28,13 +28,6 @@ bazel_format_file=("${bazel_format[@]}" --compile_one_dependency)
 
 cd $BUILD_WORKSPACE_DIRECTORY
 
-# manually build wrapper to set up runfiles tree
-# https://stackoverflow.com/questions/48178323/during-bazel-build-when-is-target-runfiles-directory-properly-set-up
-"$bazel" build \
-         --noshow_progress \
-         --ui_event_filters=-info,-stdout \
-         @@WORKSPACE@//:wrapper &>/dev/null
-
 args=$(printf " union %s" "${@}" | sed "s/^ union \(.*\)/\1/")
 
 source_files=$("${bazel_query[@]}" \
