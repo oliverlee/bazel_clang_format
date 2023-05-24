@@ -40,6 +40,8 @@ args=$(printf " union %s" "${@}" | sed "s/^ union \(.*\)/\1/")
 source_files=$("${bazel_query[@]}" \
     "let t = kind(\"cc_.* rule\", ${args:-//...}) in labels(srcs, \$t) union labels(hdrs, \$t)")
 
+"$bazel" build @BINARY@
+
 result=$("${bazel_format_file[@]}" \
              --keep_going \
              --check_up_to_date \
@@ -47,7 +49,7 @@ result=$("${bazel_format_file[@]}" \
 
 files=$(stale "$result")
 
-if [[ -z $files ]] && [[ $(echo "$result" | grep "ERROR:" | wc -l) -gt 0 ]]; then
+if [[ -z $files ]] && [[ $(echo "$result" | grep "ERROR:"  | wc -l) -gt 0 ]]; then
     echo "$result"
     exit 1
 fi
