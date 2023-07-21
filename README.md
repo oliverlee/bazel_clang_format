@@ -11,7 +11,6 @@ clang-format.
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_repository")
 
 BAZEL_CLANG_FORMAT_COMMIT = ...
-
 BAZEL_CLANG_FORMAT_SHA = ...
 
 http_repository(
@@ -107,6 +106,29 @@ Or to format specific targets:
 
 ```sh
 bazel run @bazel_clang_format//:update -- //src/...
+```
+
+## ignoring formatting of specific targets
+
+Formatting can be skipped for specific targets by specifying a filegroup
+
+```python
+# //:BUILD.bazel
+
+filegroup(
+    name = "clang_format_ignore",
+    srcs = [
+       "//third_party/lib1",
+       "//third_party/lib2",
+    ],
+)
+```
+
+```sh
+# //.bazelrc
+...
+build:clang-format --@bazel_clang_format//:ignore=//:clang_format_ignore
+...
 ```
 
 ## defaults without .bazelrc

@@ -22,6 +22,7 @@ bazel_format=("$bazel" build \
                     --aspects=@@WORKSPACE@//:defs.bzl%clang_format_aspect \
                     --@@WORKSPACE@//:binary=@BINARY@ \
                     --@@WORKSPACE@//:config=@CONFIG@ \
+                    --@@WORKSPACE@//:ignore=@IGNORE@ \
                     --output_groups=report)
 
 bazel_format_file=("${bazel_format[@]}" --compile_one_dependency)
@@ -31,7 +32,7 @@ cd $BUILD_WORKSPACE_DIRECTORY
 args=$(printf " union %s" "${@}" | sed "s/^ union \(.*\)/\1/")
 
 source_files=$("${bazel_query[@]}" \
-    "let t = kind(\"cc_.* rule\", ${args:-//...}) in labels(srcs, \$t) union labels(hdrs, \$t)")
+    "let t = kind(\"cc_.* rule\", ${args:-//...} except deps(@IGNORE@)) in labels(srcs, \$t) union labels(hdrs, \$t)")
 
 "$bazel" build @BINARY@
 
