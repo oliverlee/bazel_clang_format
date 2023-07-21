@@ -29,6 +29,16 @@ label_flag(
 )
 
 filegroup(
+    name = "default_ignore",
+    srcs = [],
+)
+
+label_flag(
+    name = "ignore",
+    build_setting_default = ":default_ignore",
+)
+
+filegroup(
     name = "wrapper",
     srcs = ["wrapper.sh"],
 )

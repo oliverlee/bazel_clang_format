@@ -59,6 +59,11 @@ def _check_format(ctx, package, f):
     return out
 
 def _clang_format_aspect_impl(target, ctx):
+    ignored = {f.owner: "" for f in ctx.attr._ignore.files.to_list()}
+
+    if target.label in ignored.keys():
+        return [OutputGroupInfo(report = depset([]))]
+
     outputs = [
         _check_format(ctx, target.label.package, f)
         for f in (
@@ -69,7 +74,7 @@ def _clang_format_aspect_impl(target, ctx):
 
     return [OutputGroupInfo(report = depset(outputs))]
 
-def make_clang_format_aspect(binary = None, config = None):
+def make_clang_format_aspect(binary = None, config = None, ignore = None):
     return aspect(
         implementation = _clang_format_aspect_impl,
         fragments = ["cpp"],
@@ -86,6 +91,9 @@ def make_clang_format_aspect(binary = None, config = None):
             "_config": attr.label(
                 default = Label(config or "//:config"),
                 allow_single_file = True,
+            ),
+            "_ignore": attr.label(
+                default = Label(ignore or "//:ignore"),
             ),
             "_dry_run": attr.label(default = Label("//:dry_run")),
         },
@@ -104,6 +112,7 @@ def _clang_format_update_impl(ctx):
 
     binary = ctx.attr.binary or ctx.attr._binary
     config = ctx.attr.config or ctx.attr._config
+    ignore = ctx.attr.ignore or ctx.attr._ignore
 
     # get the workspace of bazel_clang_format, not where this update rule is
     # defined
@@ -115,6 +124,7 @@ def _clang_format_update_impl(ctx):
         substitutions = {
             "@BINARY@": str(binary.label),
             "@CONFIG@": str(config.label),
+            "@IGNORE@": str(ignore.label),
             "@WORKSPACE@": workspace,
             "@BINDIR@": bindir,
         },
@@ -141,12 +151,18 @@ clang_format_update = rule(
             allow_single_file = True,
             default = Label("//:config"),
         ),
+        "_ignore": attr.label(
+            default = Label("//:ignore"),
+        ),
         "binary": attr.label(
             doc = "Set clang-format binary to use. Overrides //:binary",
         ),
         "config": attr.label(
             allow_single_file = True,
             doc = "Set clang-format config to use. Overrides //:config",
+        ),
+        "ignore": attr.label(
+            doc = "Set clang-format ignore targets to use. Overrides //:ignore",
         ),
     },
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
