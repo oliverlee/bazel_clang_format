@@ -32,7 +32,7 @@ cd $BUILD_WORKSPACE_DIRECTORY
 args=$(printf " union %s" "${@}" | sed "s/^ union \(.*\)/\1/")
 
 source_files=$("${bazel_query[@]}" \
-    "let t = kind(\"cc_.* rule\", ${args:-//...} except deps(@IGNORE@)) in labels(srcs, \$t) union labels(hdrs, \$t)")
+    "let t = kind(\"cc_.* rule\", ${args:-//...} except deps(@IGNORE@, 1)) in labels(srcs, \$t) union labels(hdrs, \$t)")
 
 "$bazel" build @BINARY@
 
