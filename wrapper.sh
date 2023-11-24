@@ -9,4 +9,4 @@ dry_run=$5
 
 test -e .clang-format || ln -s -f $config .clang-format
 
-$binary --fcolor-diagnostics --Werror $dry_run $infile > $outfile
+$binary --color=true --Werror $dry_run $infile > $outfile
