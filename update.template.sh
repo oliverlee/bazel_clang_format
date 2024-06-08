@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-bazel=$(readlink -f /proc/${PPID}/exe)
+function bazel_bin
+{
+pid=$PPID
+bin=$(readlink -f /proc/$pid/exe)
 
-function stale()
+while $bin --version | grep -q -v '^bazel'; do
+    pid=$(ps -o ppid= $pid | xargs)
+    bin=$(readlink -f /proc/$pid/exe)
+done
+
+echo "$bin"
+}
+
+bazel=$(bazel_bin)
+
+function stale
 {
 echo "$1" \
       | grep "ERROR: action 'ClangFormat" \
