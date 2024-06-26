@@ -2,26 +2,6 @@
 clang-format aspect
 """
 
-# Avoid the need to bring in bazel-skylib as a dependency
-# https://github.com/bazelbuild/bazel-skylib/blob/main/docs/common_settings_doc.md
-BuildSettingInfo = provider(
-    doc = "Contains the value of a build setting.",
-    fields = {
-        "value": "The value of the build setting in the current configuration. " +
-                 "This value may come from the command line or an upstream transition, " +
-                 "or else it will be the build setting's default.",
-    },
-)
-
-def _impl(ctx):
-    return BuildSettingInfo(value = ctx.build_setting_value)
-
-bool_flag = rule(
-    implementation = _impl,
-    build_setting = config.bool(flag = True),
-    doc = "A bool-typed build setting that can be set on the command line",
-)
-
 def _source_files_in(ctx, attr):
     if not hasattr(ctx.rule.attr, attr):
         return []
@@ -32,9 +12,8 @@ def _source_files_in(ctx, attr):
 
     return [f for f in files if f.is_source]
 
-def _check_format(ctx, package, f):
+def _check_format(ctx, package, f, update):
     binary = ctx.attr._binary.files_to_run.executable
-    dry_run = ctx.attr._dry_run[BuildSettingInfo].value
 
     out = ctx.actions.declare_file(
         "{name}.clang_format".format(
@@ -43,40 +22,51 @@ def _check_format(ctx, package, f):
         ),
     )
 
-    ctx.actions.run(
+    progress_message = "Formatting {}".format(f.short_path)
+
+    ctx.actions.run_shell(
         inputs = [ctx.file._config] + ([binary] if binary else []) + [f],
         outputs = [out],
-        executable = ctx.executable._wrapper,
-        arguments = [
-            binary.path if binary else "clang-format",
-            ctx.file._config.path,
-            f.path,
-            out.path,
-        ] + (["--dry-run"] if dry_run else [""]),
+        command = """
+set -euo pipefail
+
+test -e .clang-format || ln -s -f {config} .clang-format
+{binary} --color=true --Werror {options} {infile} > {outfile}
+""".format(
+    config = ctx.file._config.path,
+    binary = binary.path if binary else "clang-format",
+    infile = f.path,
+    outfile = out.path,
+    options = "" if update else "--dry-run",
+),
         mnemonic = "ClangFormat",
+        progress_message = progress_message if update else None,
     )
 
     return out
 
-def _clang_format_aspect_impl(target, ctx):
-    ignored = {f.owner: "" for f in ctx.attr._ignore.files.to_list()}
+def _clang_format_aspect_impl(update):
+    def impl(target, ctx):
+        ignored = {f.owner: "" for f in ctx.attr._ignore.files.to_list()}
 
-    if target.label in ignored.keys():
-        return [OutputGroupInfo(report = depset([]))]
+        if target.label in ignored.keys():
+            return [OutputGroupInfo(report = depset([]))]
 
-    outputs = [
-        _check_format(ctx, target.label.package, f)
-        for f in (
-            _source_files_in(ctx, "srcs") +
-            _source_files_in(ctx, "hdrs")
-        )
-    ]
+        outputs = [
+            _check_format(ctx, target.label.package, f, update)
+            for f in (
+                    _source_files_in(ctx, "srcs") +
+                    _source_files_in(ctx, "hdrs")
+            )
+        ]
 
-    return [OutputGroupInfo(report = depset(outputs))]
+        return [OutputGroupInfo(report = depset(outputs))]
 
-def make_clang_format_aspect(binary = None, config = None, ignore = None):
+    return impl
+
+def make_clang_format_aspect(binary = None, config = None, ignore = None, update = False):
     return aspect(
-        implementation = _clang_format_aspect_impl,
+        implementation = _clang_format_aspect_impl(update),
         fragments = ["cpp"],
         attrs = {
             "_wrapper": attr.label(
@@ -95,13 +85,13 @@ def make_clang_format_aspect(binary = None, config = None, ignore = None):
             "_ignore": attr.label(
                 default = Label(ignore or "//:ignore"),
             ),
-            "_dry_run": attr.label(default = Label("//:dry_run")),
         },
         required_providers = [CcInfo],
         toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     )
 
 clang_format_aspect = make_clang_format_aspect()
+clang_format_update_aspect = make_clang_format_aspect(update=True)
 
 def _clang_format_update_impl(ctx):
     update_format = ctx.actions.declare_file(

@@ -17,15 +17,11 @@ function bazel_bin
 bazel=$(bazel_bin)
 
 bazel_query=("$bazel" query \
-                      --noshow_progress \
-                      "--ui_event_filters=-info" \
                       "--color=yes")
 
-bazel_format=("$bazel" build \
-                       --noshow_progress \
-                       "--ui_event_filters=-info,-stdout" \
+bazel_update=("$bazel" build \
                        "--color=yes" \
-                       "--aspects=@@WORKSPACE@//:defs.bzl%clang_format_aspect" \
+                       "--aspects=@@WORKSPACE@//:defs.bzl%clang_format_update_aspect" \
                        "--@@WORKSPACE@//:binary=@BINARY@" \
                        "--@@WORKSPACE@//:config=@CONFIG@" \
                        "--@@WORKSPACE@//:ignore=@IGNORE@" \
@@ -33,11 +29,21 @@ bazel_format=("$bazel" build \
                        --keep_going \
                        --verbose_failures)
 
+bazel_check=("$bazel" build \
+                      "--color=yes" \
+                      "--aspects=@@WORKSPACE@//:defs.bzl%clang_format_aspect" \
+                      "--@@WORKSPACE@//:binary=@BINARY@" \
+                      "--@@WORKSPACE@//:config=@CONFIG@" \
+                      "--@@WORKSPACE@//:ignore=@IGNORE@" \
+                      "--output_groups=report" \
+                      --keep_going \
+                      --verbose_failures)
+
 function stale
 {
     format_args=("$@")
 
-    result=$("${bazel_format[@]}" \
+    result=$("${bazel_check[@]}" \
                  --check_up_to_date \
                  "${format_args[@]}" 2>&1 || true)
 
@@ -62,7 +68,6 @@ function update
     # replace source with formatted version
     mv "$generated" "$1"
 }
-
 
 cd "$BUILD_WORKSPACE_DIRECTORY"
 
@@ -89,12 +94,12 @@ fi
 # use bazel to generate the formatted files in a separate
 # directory in case the user is overriding .clang-format
 if [[ ${#files[@]} -ne 0 ]]; then
-    "${bazel_format[@]}" --compile_one_dependency --@@WORKSPACE@//:dry_run=False --remote_download_outputs=toplevel "${files[@]}"
+    "${bazel_update[@]}" --compile_one_dependency --remote_download_outputs=toplevel "${files[@]}"
 fi
 
 # format all header only libs
 if [[ ${#header_files[@]} -ne 0 ]]; then
-    "${bazel_format[@]}" --@@WORKSPACE@//:dry_run=False --remote_download_outputs=toplevel "${header_libraries[@]}"
+    "${bazel_update[@]}" --remote_download_outputs=toplevel "${header_libraries[@]}"
 fi
 
 export -f update
@@ -102,8 +107,8 @@ printf '%s\n' "${files[@]}" "${header_files[@]}" | xargs -P 0 -n 1 -I {} /bin/ba
 
 # run format check to cache success
 if [[ ${#files[@]} -ne 0 ]]; then
-    "${bazel_format[@]}" --compile_one_dependency "${files[@]}"
+    "${bazel_check[@]}" --compile_one_dependency "${files[@]}"
 fi
 if [[ ${#header_files[@]} -ne 0 ]]; then
-    "${bazel_format[@]}" "${header_libraries[@]}"
+    "${bazel_check[@]}" "${header_libraries[@]}"
 fi
