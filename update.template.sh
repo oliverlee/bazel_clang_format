@@ -19,25 +19,22 @@ bazel=$(bazel_bin)
 bazel_query=("$bazel" query \
                       "--color=yes")
 
-bazel_update=("$bazel" build \
+# https://bazel.build/reference/be/common-definitions#common.tags
+bazel_format=("$bazel" build \
                        "--color=yes" \
-                       "--aspects=@@WORKSPACE@//:defs.bzl%clang_format_update_aspect" \
                        "--@@WORKSPACE@//:binary=@BINARY@" \
                        "--@@WORKSPACE@//:config=@CONFIG@" \
                        "--@@WORKSPACE@//:ignore=@IGNORE@" \
                        "--output_groups=report" \
+                       "--modify_execution_info=ClangFormat=+no-remote-cache" \
                        --keep_going \
                        --verbose_failures)
 
-bazel_check=("$bazel" build \
-                      "--color=yes" \
-                      "--aspects=@@WORKSPACE@//:defs.bzl%clang_format_aspect" \
-                      "--@@WORKSPACE@//:binary=@BINARY@" \
-                      "--@@WORKSPACE@//:config=@CONFIG@" \
-                      "--@@WORKSPACE@//:ignore=@IGNORE@" \
-                      "--output_groups=report" \
-                      --keep_going \
-                      --verbose_failures)
+bazel_check=("${bazel_format[@]}" \
+                 "--aspects=@@WORKSPACE@//:defs.bzl%clang_format_aspect")
+
+bazel_update=("${bazel_format[@]}" \
+                  "--aspects=@@WORKSPACE@//:defs.bzl%clang_format_update_aspect")
 
 function stale
 {
