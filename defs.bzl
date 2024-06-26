@@ -2,26 +2,6 @@
 clang-format aspect
 """
 
-# Avoid the need to bring in bazel-skylib as a dependency
-# https://github.com/bazelbuild/bazel-skylib/blob/main/docs/common_settings_doc.md
-BuildSettingInfo = provider(
-    doc = "Contains the value of a build setting.",
-    fields = {
-        "value": "The value of the build setting in the current configuration. " +
-                 "This value may come from the command line or an upstream transition, " +
-                 "or else it will be the build setting's default.",
-    },
-)
-
-def _impl(ctx):
-    return BuildSettingInfo(value = ctx.build_setting_value)
-
-bool_flag = rule(
-    implementation = _impl,
-    build_setting = config.bool(flag = True),
-    doc = "A bool-typed build setting that can be set on the command line",
-)
-
 def _source_files_in(ctx, attr):
     if not hasattr(ctx.rule.attr, attr):
         return []
@@ -32,59 +12,73 @@ def _source_files_in(ctx, attr):
 
     return [f for f in files if f.is_source]
 
-def _check_format(ctx, package, f):
+def _do_format(ctx, f, format_options, execution_reqs):
     binary = ctx.attr._binary.files_to_run.executable
-    dry_run = ctx.attr._dry_run[BuildSettingInfo].value
+    out = ctx.actions.declare_file(f.short_path + ".clang_format")
 
-    out = ctx.actions.declare_file(
-        "{name}.clang_format".format(
-            # don't duplicate package in the out file
-            name = f.short_path.removeprefix(package + "/"),
-        ),
-    )
-
-    ctx.actions.run(
-        inputs = [ctx.file._config] + ([binary] if binary else []) + [f],
+    ctx.actions.run_shell(
+        inputs = [
+            ctx.file._config,
+            f,
+        ] + ([binary] if binary else []),
         outputs = [out],
-        executable = ctx.executable._wrapper,
-        arguments = [
-            binary.path if binary else "clang-format",
-            ctx.file._config.path,
-            f.path,
-            out.path,
-        ] + (["--dry-run"] if dry_run else [""]),
+        command = """
+set -euo pipefail
+
+test -e .clang-format || ln -s -f {config} .clang-format
+{binary} {format_options} {infile}
+touch {outfile}
+""".format(
+    config = ctx.file._config.path,
+    binary = binary.path if binary else "clang-format",
+    format_options = " ".join(format_options),
+    infile = f.path,
+    outfile = out.path,
+),
         mnemonic = "ClangFormat",
+        progress_message = "Formatting {}".format(f.short_path),
+        execution_requirements = execution_reqs,
     )
 
     return out
 
-def _clang_format_aspect_impl(target, ctx):
-    ignored = {f.owner: "" for f in ctx.attr._ignore.files.to_list()}
+def _clang_format_aspect_impl(format_options, execution_requirements):
+    def impl(target, ctx):
+        ignored = {f.owner: "" for f in ctx.attr._ignore.files.to_list()}
 
-    if target.label in ignored.keys():
-        return [OutputGroupInfo(report = depset([]))]
+        if target.label in ignored.keys():
+            return [OutputGroupInfo(report = depset([]))]
 
-    outputs = [
-        _check_format(ctx, target.label.package, f)
-        for f in (
-            _source_files_in(ctx, "srcs") +
-            _source_files_in(ctx, "hdrs")
-        )
-    ]
+        outputs = [
+            _do_format(
+                ctx,
+                f,
+                format_options,
+                execution_requirements,
+            )
+            for f in (
+                    _source_files_in(ctx, "srcs") +
+                    _source_files_in(ctx, "hdrs")
+            )
+        ]
 
-    return [OutputGroupInfo(report = depset(outputs))]
+        return [OutputGroupInfo(report = depset(outputs))]
 
-def make_clang_format_aspect(binary = None, config = None, ignore = None):
+    return impl
+
+def make_clang_format_aspect(
+        binary = None,
+        config = None,
+        ignore = None,
+        options = None,
+        execution_requirements = None):
     return aspect(
-        implementation = _clang_format_aspect_impl,
+        implementation = _clang_format_aspect_impl(
+            options or [],
+            execution_requirements or {},
+        ),
         fragments = ["cpp"],
         attrs = {
-            "_wrapper": attr.label(
-                executable = True,
-                cfg = "exec",
-                allow_files = True,
-                default = Label("//:wrapper"),
-            ),
             "_binary": attr.label(
                 default = Label(binary or "//:binary"),
             ),
@@ -95,76 +89,35 @@ def make_clang_format_aspect(binary = None, config = None, ignore = None):
             "_ignore": attr.label(
                 default = Label(ignore or "//:ignore"),
             ),
-            "_dry_run": attr.label(default = Label("//:dry_run")),
         },
         required_providers = [CcInfo],
         toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     )
 
-clang_format_aspect = make_clang_format_aspect()
-
-def _clang_format_update_impl(ctx):
-    update_format = ctx.actions.declare_file(
-        "bazel_clang_format.{}.sh".format(ctx.attr.name),
-    )
-
-    bindir = update_format.path[:update_format.path.find("bin/")] + "bin/"
-
-    binary = ctx.attr.binary or ctx.attr._binary
-    config = ctx.attr.config or ctx.attr._config
-    ignore = ctx.attr.ignore or ctx.attr._ignore
-
-    # get the workspace of bazel_clang_format, not where this update rule is
-    # defined
-    workspace = ctx.attr._template.label.workspace_name
-
-    ctx.actions.expand_template(
-        template = ctx.attr._template.files.to_list()[0],
-        output = update_format,
-        substitutions = {
-            "@BINARY@": str(binary.label),
-            "@CONFIG@": str(config.label),
-            "@IGNORE@": str(ignore.label),
-            "@WORKSPACE@": workspace,
-            "@BINDIR@": bindir,
-        },
-    )
-
-    format_bin = binary.files_to_run.executable
-    runfiles = ctx.runfiles(
-        ([format_bin] if format_bin else []) +
-        config.files.to_list(),
-    )
-
-    return [DefaultInfo(
-        executable = update_format,
-        runfiles = runfiles,
-    )]
-
-clang_format_update = rule(
-    implementation = _clang_format_update_impl,
-    fragments = ["cpp"],
-    attrs = {
-        "_template": attr.label(default = Label("//:template")),
-        "_binary": attr.label(default = Label("//:binary")),
-        "_config": attr.label(
-            allow_single_file = True,
-            default = Label("//:config"),
-        ),
-        "_ignore": attr.label(
-            default = Label("//:ignore"),
-        ),
-        "binary": attr.label(
-            doc = "Set clang-format binary to use. Overrides //:binary",
-        ),
-        "config": attr.label(
-            allow_single_file = True,
-            doc = "Set clang-format config to use. Overrides //:config",
-        ),
-        "ignore": attr.label(
-            doc = "Set clang-format ignore targets to use. Overrides //:ignore",
-        ),
+check_aspect = make_clang_format_aspect(
+    options = ["--color=true", "--Werror", "--dry-run"],
+    execution_requirements = {
+        "no-remote": "1",
+        "local": "1",
     },
-    toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
-    executable = True,
+)
+
+fix_aspect = make_clang_format_aspect(
+    options = ["-i"],
+    # https://stackoverflow.com/questions/50025990/disable-sandbox-in-custom-rule
+    #
+    # https://bazel.build/reference/be/common-definitions#common.tags
+    #
+    # however, due to
+    # https://github.com/bazelbuild/bazel/issues/15516
+    # https://github.com/bazelbuild/bazel/issues/21587
+    #
+    # fixing formatting will require use of --use_action_cache=false
+    # https://bazel.build/versions/6.5.0/docs/user-manual#use-action-cache
+    execution_requirements = {
+        "no-sandbox": "1",
+        "no-cache": "1",
+        "no-remote": "1",
+        "local": "1",
+    },
 )

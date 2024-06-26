@@ -1,4 +1,4 @@
- build:clang-format --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect
+ build:clang-format --aspects @bazel_clang_format//:defs.bzl%check_aspect
  build:clang-format --@bazel_clang_format//:binary=@llvm14//:clang-format
  build:clang-format --@bazel_clang_format//:ignore=//:clang_format_ignore
  build:clang-format --output_groups=report

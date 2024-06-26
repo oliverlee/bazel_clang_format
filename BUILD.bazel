@@ -1,11 +1,4 @@
-load("//:defs.bzl", "bool_flag", "clang_format_update")
-
 package(default_visibility = ["//visibility:public"])
-
-bool_flag(
-    name = "dry_run",
-    build_setting_default = True,
-)
 
 # Your binary should be a `*_binary`, *NOT* filegroup
 filegroup(
@@ -36,18 +29,4 @@ filegroup(
 label_flag(
     name = "ignore",
     build_setting_default = ":default_ignore",
-)
-
-filegroup(
-    name = "wrapper",
-    srcs = ["wrapper.sh"],
-)
-
-filegroup(
-    name = "template",
-    srcs = ["update.template.sh"],
-)
-
-clang_format_update(
-    name = "update",
 )
