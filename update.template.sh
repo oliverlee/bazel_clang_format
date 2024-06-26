@@ -3,101 +3,107 @@ set -euo pipefail
 
 function bazel_bin
 {
-pid=$PPID
-bin=$(readlink -f /proc/$pid/exe)
+    pid=$PPID
+    bin=$(readlink -f "/proc/$pid/exe")
 
-while $bin --version | grep -q -v '^bazel'; do
-    pid=$(ps -o ppid= $pid | xargs)
-    bin=$(readlink -f /proc/$pid/exe)
-done
+    while $bin --version | grep -q -v '^bazel'; do
+        pid=$(ps -o ppid= $pid | xargs)
+        bin=$(readlink -f "/proc/$pid/exe")
+    done
 
-echo "$bin"
+    echo "$bin"
 }
 
 bazel=$(bazel_bin)
 
-function stale
-{
-echo "$1" \
-      | grep "ERROR: action 'ClangFormat" \
-      | sed "s/^ERROR: action 'ClangFormat \(.*\)\.clang_format' is not up-to-date$/\1/" || true
-}
-
 bazel_query=("$bazel" query \
-                      --color=yes \
                       --noshow_progress \
-                      --ui_event_filters=-info)
+                      "--ui_event_filters=-info" \
+                      "--color=yes")
 
 bazel_format=("$bazel" build \
-                    --noshow_progress \
-                    --ui_event_filters=-info,-stdout \
-                    --color=no \
-                    --aspects=@@WORKSPACE@//:defs.bzl%clang_format_aspect \
-                    --@@WORKSPACE@//:binary=@BINARY@ \
-                    --@@WORKSPACE@//:config=@CONFIG@ \
-                    --@@WORKSPACE@//:ignore=@IGNORE@ \
-                    --output_groups=report)
+                       --noshow_progress \
+                       "--ui_event_filters=-info,-stdout" \
+                       "--color=yes" \
+                       "--aspects=@@WORKSPACE@//:defs.bzl%clang_format_aspect" \
+                       "--@@WORKSPACE@//:binary=@BINARY@" \
+                       "--@@WORKSPACE@//:config=@CONFIG@" \
+                       "--@@WORKSPACE@//:ignore=@IGNORE@" \
+                       "--output_groups=report" \
+                       --keep_going \
+                       --verbose_failures)
 
-bazel_format_file=("${bazel_format[@]}" --compile_one_dependency)
+function stale
+{
+    format_args=("$@")
 
-cd $BUILD_WORKSPACE_DIRECTORY
+    result=$("${bazel_format[@]}" \
+                 --check_up_to_date \
+                 "${format_args[@]}" 2>&1 || true)
 
-args=$(printf " union %s" "${@}" | sed "s/^ union \(.*\)/\1/")
+    echo "$result" \
+        | grep ".*ERROR:.*action 'ClangFormat" \
+        | sed -e 's/\x1b\[[0-9;]*m//g' \
+        | sed -e "s/^.* action 'ClangFormat \(.*\)\.clang_format' is not up-to-date$/\1/" || true
+}
 
-source_files=$("${bazel_query[@]}" \
-    "let t = kind(\"cc_.* rule\", ${args:-//...} except deps(@IGNORE@, 1)) in labels(srcs, \$t) union labels(hdrs, \$t)")
-
-"$bazel" build @BINARY@
-
-result=$("${bazel_format_file[@]}" \
-             --keep_going \
-             --check_up_to_date \
-             $source_files 2>&1 || true)
-
-files=$(stale "$result")
-
-if [[ -z $files ]] && [[ $(echo "$result" | grep "ERROR:"  | wc -l) -gt 0 ]]; then
-    echo "$result"
-    exit 1
-fi
-
-# libraries without `srcs` are not handled correctly with `--compile_one_dependency`
-header_libs=$("${bazel_query[@]}" \
-    "attr(\"srcs\", \"\[\]\", kind(\"cc_library rule\", ${args:-//...}))")
-
-result=$("${bazel_format[@]}" \
-             --keep_going \
-             --check_up_to_date \
-             $header_libs 2>&1 || true)
-
-header_files=$(stale "$result")
-
-file_count=$(echo "$files" | sed '/^\s*$/d' | wc -l)
-header_file_count=$(echo "$header_files" | sed '/^\s*$/d' | wc -l)
-
-[[ $file_count -ne 0 ]] || [[ $header_file_count -ne 0 ]] || exit 0
-
-# use bazel to generate the formatted files in a separate
-# directory in case the user is overriding .clang-format
-[[ $file_count -eq 0 ]] || "${bazel_format_file[@]}" --@@WORKSPACE@//:dry_run=False $files
-
-# format all header only libs
-[[ $header_file_count -eq 0 ]] || "${bazel_format[@]}" --@@WORKSPACE@//:dry_run=False $header_libs
-
-for arg in $(echo "$files" "$header_files"); do
-    generated="@BINDIR@${arg}.clang_format"
+function update
+{
+    generated="@BINDIR@${1}.clang_format"
     if [[ ! -f "$generated" ]]; then
-        continue
+        echo "ERROR: unable to find $generated"
+        exit 1
     fi
 
     # fix file mode bits
     # https://github.com/bazelbuild/bazel/issues/2888
-    chmod $(stat -c "%a" "$arg") "$generated"
+    chmod "$(stat -c "%a" "$1")" "$generated"
 
     # replace source with formatted version
-    mv "$generated" "$arg"
-done
+    mv "$generated" "$1"
+}
+
+
+cd "$BUILD_WORKSPACE_DIRECTORY"
+
+"$bazel" build @BINARY@
+
+args=$(printf " union %s" "${@}" | sed "s/^ union \(.*\)/\1/")
+
+source_targets="let t = kind(\"cc_.* rule\", ${args:-//...} except deps(@IGNORE@, 1)) in labels(srcs, \$t) union labels(hdrs, \$t)"
+readarray -t source_files < <("${bazel_query[@]}" "$source_targets")
+readarray -t files < <(stale --compile_one_dependency "${source_files[@]}")
+
+# libraries without `srcs` are not handled correctly with `--compile_one_dependency`
+header_targets="attr(\"srcs\", \"\[\]\", kind(\"cc_library rule\", ${args:-//...}))"
+readarray -t header_libraries < <("${bazel_query[@]}" "$header_targets")
+readarray -t header_files < <(stale "${header_libraries[@]}")
+
+# https://stackoverflow.com/questions/48394251/why-are-empty-arrays-treated-as-unset-in-bash
+set +u
+
+if [[ ${#files[@]} -eq 0 ]] && [[ ${#header_files[@]} -eq 0 ]]; then
+    exit 0
+fi
+
+# use bazel to generate the formatted files in a separate
+# directory in case the user is overriding .clang-format
+if [[ ${#files[@]} -ne 0 ]]; then
+    "${bazel_format[@]}" --compile_one_dependency --@@WORKSPACE@//:dry_run=False --remote_download_outputs=toplevel "${files[@]}"
+fi
+
+# format all header only libs
+if [[ ${#header_files[@]} -ne 0 ]]; then
+    "${bazel_format[@]}" --@@WORKSPACE@//:dry_run=False --remote_download_outputs=toplevel "${header_libraries[@]}"
+fi
+
+export -f update
+printf '%s\n' "${files[@]}" "${header_files[@]}" | xargs -P 0 -n 1 -I {} /bin/bash -c 'update {}'
 
 # run format check to cache success
-[[ $file_count -eq 0 ]] || "${bazel_format_file[@]}" $files
-[[ $header_file_count -eq 0 ]] || "${bazel_format[@]}" $header_libs
+if [[ ${#files[@]} -ne 0 ]]; then
+    "${bazel_format[@]}" --compile_one_dependency "${files[@]}"
+fi
+if [[ ${#header_files[@]} -ne 0 ]]; then
+    "${bazel_format[@]}" "${header_libraries[@]}"
+fi
