@@ -1,21 +1,22 @@
 # bazel_clang_format
 
-Run clang-format on Bazel C++ targets directly. It's like
+Run `clang-format` on Bazel C++ targets directly. It's like
 [bazel_clang_tidy](https://github.com/erenon/bazel_clang_tidy) but for
-clang-format.
+`clang-format`.
 
 ## usage
 
-```py
+Update your project with
+
+```Starlark
 # //:WORKSPACE.bazel
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_repository")
 
 BAZEL_CLANG_FORMAT_COMMIT = ...
-BAZEL_CLANG_FORMAT_SHA = ...
 
 http_repository(
     name = "bazel_clang_format",
-    sha256 = BAZEL_CLANG_FORMAT_SHA,
+    integrity = ...,
     strip_prefix = "bazel_clang_format-{commit}".format(
         commit = BAZEL_CLANG_FORMAT_COMMIT,
     ),
@@ -25,155 +26,147 @@ http_repository(
 )
 ```
 
-You can now compile using the default clang format configuration provided using
-the following command:
+```Starlark
+# //:.bazelrc
 
-```
-bazel build //... \
-  --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect \
-  --output_groups=report
+build:clang-format --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect
+build:clang-format --output_groups=report
 ```
 
-By default, `.clang-format` from this repo is applied. If you wish to override
-the config, define a filegroup:
+Check formatting with
 
-```py
+```sh
+bazel build //... --config=clang-format
+```
+
+Fix formatting with
+
+```sh
+bazel run @bazel_clang_format//:update
+```
+
+This will use `clang-format` in your `PATH` and `.clang-format` defined in this
+repo.
+
+
+### using a hermetic toolchain
+
+<details><summary></summary>
+
+To specify a specific binary (e.g. `clang-format` is specified by a hermetic
+toolchain like [this](https://github.com/grailbio/bazel-toolchain)), define a
+build setting in `.bazelrc`.
+
+```Starlark
+# //:.bazelrc
+
+build:clang-format --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect
+build:clang-format --output_groups=report
+build:clang-format --@bazel_clang_format//:binary=@llvm18//:clang-format # <-----
+...
+```
+
+and define a `clang_format_update` rule that replaces
+`@bazel_clang_format//:update`.
+
+```Starlark
 # //:BUILD.bazel
-filegroup(
-    name = "clang_format_config",
-    srcs = [".clang-format"],
-    visibility = ["//visibility:public"],
+
+load("@bazel_clang_format//:defs.bzl", "clang_format_update")
+
+clang_format_update(
+    name = "clang-format",
+    binary = "@llvm18//:clang-format",
 )
 ```
 
-and override the default config file using the config setting:
+Check formatting with
 
 ```sh
-bazel build //... \
-  --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect \
-  --@bazel_clang_format//:config=//:clang_format_config \ # <-----------
-  --output_groups=report
+bazel build //... --config=clang-format
 ```
 
-To specify a specific binary (e.g. `clang-format` is specified by a hermetic
-toolchain like [this](https://github.com/grailbio/bazel-toolchain), with the
-binary setting:
+Fix formatting with
 
 ```sh
-bazel build //... \
-  --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect \
-  --@bazel_clang_format//:binary=@llvm15//:clang-format \ # <-----------
-  --output_groups=report
+bazel run //:clang-format
 ```
 
-Now if you don't want to type this out every time, it is recommended that you
-add a config in your .bazelrc that matches this command line;
+</details>
 
-Config shorthand:
+### specifying `.clang-format`
 
+<details><summary></summary>
+
+To override the default `.clang-format`, define a `filegroup` containing the
+replacement config and update both the `clang-format` build setting in
+`.bazelrc` and the `clang_format_update` rule.
+
+```Starlark
+# //:BUILD.bazel
+
+load("@bazel_clang_format//:defs.bzl", "clang_format_update")
+
+filegroup(
+    name = "clang-format-config",
+    srcs = [".clang-format"],
+    visibility = ["//visibility:public"],
+)
+
+clang_format_update(
+    name = "clang-format",
+    config = ":clang-format-config",
+)
 ```
-# //.bazelrc
+
+```Starlark
+# //:.bazelrc
+
 build:clang-format --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect
 build:clang-format --output_groups=report
-```
-or with configuration:
-
-```
-# //.bazelrc
-build:clang-format --aspects @bazel_clang_format//:defs.bzl%clang_format_aspect
-build:clang-format --@bazel_clang_format//:binary=@llvm15//:clang-format
-build:clang-format --@bazel_clang_format//:config=//:clang_format_config
-build:clang-format --output_groups=report
+build:clang-format --@bazel_clang_format//:config=//:clang-format-config # <-----
+...
 ```
 
-then run:
 
-```sh
-bazel build //... --config clang-format
-```
+</details>
 
-To format all source files:
+### ignoring certain targets
 
-```sh
-bazel run @bazel_clang_format//:update \
-  --@bazel_clang_format//:binary=@llvm15//:clang_format \
-  --@bazel_clang_format//:config=//:clang_format_config
-```
+<details><summary></summary>
 
-with a specific binary/config if desired.
+Formatting can be skipped for certain targets by specifying a filegroup
 
-Or to format specific targets:
-
-```sh
-bazel run @bazel_clang_format//:update -- //src/...
-```
-
-## ignoring formatting of specific targets
-
-Formatting can be skipped for specific targets by specifying a filegroup
-
-```python
+```Starlark
 # //:BUILD.bazel
 
 filegroup(
-    name = "clang_format_ignore",
+    name = "clang-format-ignore",
     srcs = [
        "//third_party/lib1",
        "//third_party/lib2",
     ],
 )
-```
-
-```sh
-# //.bazelrc
-...
-build:clang-format --@bazel_clang_format//:ignore=//:clang_format_ignore
-...
-```
-
-## defaults without .bazelrc
-
-Both the aspect and update rule can be defined locally to bake in a default
-binary or config.
-
-```python
-# //:BUILD.bazel
-load("@bazel_clang_format//:defs.bzl", "clang_format_update")
-
-alias(
-    name = "default_clang_format_binary",
-    actual = "@llvm_toolchain//:clang-format",
-)
-
-filegroup(
-    name = "default_clang_format_config",
-    srcs = [".clang-format"]
-    visibility = ["//visibility:public"],
-)
 
 clang_format_update(
-    name = "clang_format",
-    binary = ":default_clang_format_binary",
-    config = ":default_clang_format_config",
+    name = "clang-format",
+    ignore = ":clang-format-ignore",
 )
 ```
 
-```python
-# //:aspects.bzl
-load("@bazel_clang_format//:defs.bzl", "make_clang_format_aspect")
-
-clang_format = make_clang_format_aspect(
-    binary = "//:default_clang_format_binary",
-    config = "//:default_clang_format_config",
-)
+```Starlark
+# //.bazelrc
+...
+build:clang-format --@bazel_clang_format//:ignore=//:clang-format-ignore
+...
 ```
 
-```sh
-bazel run //:clang_format
-bazel build //... --aspects //:aspects.bzl%clang_format --output_groups=report
-```
+</details>
 
 ## Requirements
 
 - Bazel ???
 - clang-format ???
+
+I'm not sure what the minimum versions are but please let me know if you are
+using a version that doesn't work.
