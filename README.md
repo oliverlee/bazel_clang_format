@@ -52,7 +52,6 @@ bazel build //... --config=clang-format-fix
 This will use `clang-format` in your `PATH` and `.clang-format` defined in this
 repo.
 
-
 ### using a hermetic toolchain
 
 <details><summary></summary>
@@ -98,7 +97,7 @@ filegroup(
 # //:.bazelrc
 
 build:clang-format-base --output_groups=report
-build:clang-format-base --@bazel_clang_format//:config=//:clang-format-config # <-----
+build:clang-format-base --@bazel_clang_format//:config=//:clang-format-config
 ...
 ```
 
@@ -126,7 +125,7 @@ filegroup(
 # //:.bazelrc
 
 build:clang-format-base --output_groups=report
-build:clang-format-base --@bazel_clang_format//:ignore=//:clang-format-ignore# <-----
+build:clang-format-base --@bazel_clang_format//:ignore=//:clang-format-ignore
 ...
 ```
 

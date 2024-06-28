@@ -4,6 +4,6 @@ cc_binary(
 )
 
 filegroup(
-    name = "clang_format_config",
+    name = "clang-format-config",
     srcs = [".clang-format"],
 )
