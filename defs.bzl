@@ -26,15 +26,21 @@ def _do_format(ctx, f, format_options, execution_reqs):
 set -euo pipefail
 
 test -e .clang-format || ln -s -f {config} .clang-format
-{binary} {format_options} {infile}
+
+# https://github.com/llvm/llvm-project/issues/46336
+# although newer versions of clang-format (e.g. 18.1.4) *do* appear to work
+# with symlinks
+#
+{binary} {format_options} $(readlink --canonicalize {infile})
+
 touch {outfile}
 """.format(
-    config = ctx.file._config.path,
-    binary = binary.path if binary else "clang-format",
-    format_options = " ".join(format_options),
-    infile = f.path,
-    outfile = out.path,
-),
+            config = ctx.file._config.path,
+            binary = binary.path if binary else "clang-format",
+            format_options = " ".join(format_options),
+            infile = f.path,
+            outfile = out.path,
+        ),
         mnemonic = "ClangFormat",
         progress_message = "Formatting {}".format(f.short_path),
         execution_requirements = execution_reqs,
@@ -57,8 +63,8 @@ def _clang_format_aspect_impl(format_options, execution_requirements):
                 execution_requirements,
             )
             for f in (
-                    _source_files_in(ctx, "srcs") +
-                    _source_files_in(ctx, "hdrs")
+                _source_files_in(ctx, "srcs") +
+                _source_files_in(ctx, "hdrs")
             )
         ]
 

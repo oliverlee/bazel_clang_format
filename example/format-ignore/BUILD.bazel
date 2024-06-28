@@ -4,12 +4,7 @@ cc_binary(
 )
 
 filegroup(
-    name = "clang_format_config",
-    srcs = [".clang-format"],
-)
-
-filegroup(
-    name = "clang_format_ignore",
+    name = "clang-format-ignore",
     srcs = [
         ":main",
     ],

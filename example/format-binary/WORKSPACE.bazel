@@ -7,11 +7,9 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 BAZEL_TOOLCHAIN_COMMIT = "66f938c956d247d01997ecfc84725f165ceaf1ed"
 
-BAZEL_TOOLCHAIN_SHA = None
-
 http_archive(
     name = "com_grail_bazel_toolchain",
-    sha256 = BAZEL_TOOLCHAIN_SHA,
+    integrity = "sha256-Gf4ow1hoJKbokzIAiGXv9PskwCR63o9ryKN+CLsaemw=",
     strip_prefix = "bazel-toolchain-{commit}".format(
         commit = BAZEL_TOOLCHAIN_COMMIT,
     ),

@@ -12,6 +12,7 @@ jobs:
   check-format:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - example: default
@@ -19,17 +20,53 @@ jobs:
           - example: format-binary
             errors: 2
           - example: format-config
-            errors: 0
+            errors: 1
           - example: format-ignore
             errors: 0
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - shell: bash
+        run: |
+          set -x
+
           cd example/${{ matrix.example }}
 
-          bazel build \
-            --config=clang-format \
-            --color=yes \
-            //... 2>&1 | tee log
+          if bazel build \
+               --config=clang-format \
+               --color=yes \
+               //... 2>&1 | tee log; then
+            [[ ${{ matrix.errors }} -eq 0 ]]
+          else
+            [[ ${{ matrix.errors }} -ne 0 ]]
+          fi
 
-          test ${{ matrix.errors }} -eq $(cat log | grep -c "Wclang-format-violations")
+          [[ ${{ matrix.errors }} -eq $(cat log | grep -c "Wclang-format-violations") ]]
+
+  fix-format:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - example: default
+          - example: format-binary
+          - example: format-config
+          - example: format-ignore
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          cd example/${{ matrix.example }}
+
+          bazel build --config=clang-format-fix
+
+          bazel build --config=clang-format
+
+  all:
+    runs-on: ubuntu-latest
+    if: ${{ github.base_ref == 'main' }}
+    needs:
+      - check-format
+      - fix-format
+    steps:
+    - run: true
