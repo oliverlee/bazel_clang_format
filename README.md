@@ -134,7 +134,7 @@ build:clang-format-base --@bazel_clang_format//:ignore=//:clang-format-ignore
 ## Requirements
 
 - Bazel ???
-- clang-format ???
+- ClangFormat 14
 
 I'm not sure what the minimum versions are but please let me know if you are
 using a version that doesn't work.

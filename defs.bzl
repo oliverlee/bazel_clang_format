@@ -25,13 +25,11 @@ def _do_format(ctx, f, format_options, execution_reqs):
         command = """
 set -euo pipefail
 
-test -e .clang-format || ln -s -f {config} .clang-format
-
 # https://github.com/llvm/llvm-project/issues/46336
 # although newer versions of clang-format (e.g. 18.1.4) *do* appear to work
 # with symlinks
 #
-{binary} {format_options} $(readlink --canonicalize {infile})
+{binary} -style=file:{config} {format_options} $(readlink --canonicalize {infile})
 
 touch {outfile}
 """.format(
