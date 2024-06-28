@@ -28,11 +28,10 @@ http_repository(
 
 ```Starlark
 # //:.bazelrc
-
-build:clang-format --aspects @bazel_clang_format//:defs.bzl%check_aspect
+build:clang-format --aspects=@bazel_clang_format//:defs.bzl%check_aspect
 build:clang-format --output_groups=report
 
-build:clang-format-fix --aspects @bazel_clang_format//:defs.bzl%fix_aspect
+build:clang-format-fix --aspects=@bazel_clang_format//:defs.bzl%fix_aspect
 build:clang-format-fix --output_groups=report
 build:clang-format-fix --use_action_cache=false
 ```
@@ -62,13 +61,12 @@ build setting in `.bazelrc`.
 
 ```Starlark
 # //:.bazelrc
-
 build:clang-format-base --output_groups=report
 build:clang-format-base --@bazel_clang_format//:binary=@llvm18//:clang-format
 
-build:clang-format --aspects @bazel_clang_format//:defs.bzl%check_aspect
+build:clang-format --aspects=@bazel_clang_format//:defs.bzl%check_aspect
 
-build:clang-format-fix --aspects @bazel_clang_format//:defs.bzl%fix_aspect
+build:clang-format-fix --aspects=@bazel_clang_format//:defs.bzl%fix_aspect
 build:clang-format-fix --use_action_cache=false
 ```
 
@@ -95,7 +93,6 @@ filegroup(
 
 ```Starlark
 # //:.bazelrc
-
 build:clang-format-base --output_groups=report
 build:clang-format-base --@bazel_clang_format//:config=//:clang-format-config
 ...
