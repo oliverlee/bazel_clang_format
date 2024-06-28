@@ -1,8 +1,8 @@
 common --enable_bzlmod=false
 
-build:clang-format --aspects @bazel_clang_format//:defs.bzl%check_aspect
+build:clang-format --aspects=@bazel_clang_format//:defs.bzl%check_aspect
 build:clang-format --output_groups=report
 
-build:clang-format-fix --aspects @bazel_clang_format//:defs.bzl%fix_aspect
+build:clang-format-fix --aspects=@bazel_clang_format//:defs.bzl%fix_aspect
 build:clang-format-fix --output_groups=report
 build:clang-format-fix --use_action_cache=false
