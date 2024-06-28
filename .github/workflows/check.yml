@@ -1,0 +1,35 @@
+name: check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ "*" ]
+    types: [synchronize, opened, reopened, edited]
+  workflow_dispatch:
+
+jobs:
+  check-format:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - example: default
+            errors: 3
+          - example: format-binary
+            errors: 2
+          - example: format-config
+            errors: 0
+          - example: format-ignore
+            errors: 0
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cd example/${{ matrix.example }}
+
+          bazel build \
+            --config=clang-format \
+            --color=yes \
+            //... 2>&1 | tee log
+
+          test ${{ matrix.errors }} -eq $(cat log | grep -c "Wclang-format-violations")
