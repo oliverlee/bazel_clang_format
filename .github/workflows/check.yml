@@ -47,20 +47,44 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - example: default
-          - example: format-binary
-          - example: format-config
-          - example: format-ignore
+        example:
+          - default
+          - format-binary
+          - format-config
+          - format-ignore
     steps:
       - uses: actions/checkout@v4
       - shell: bash
         run: |
           cd example/${{ matrix.example }}
+          bazel build --config=clang-format-fix
+          bazel build --config=clang-format
+
+  bazel-version:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        bazel_version:
+          - latest
+          - 7.x
+          - 6.x
+          - 5.x
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        env:
+          USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
+        run: |
+          cd example/default
+
+          version=${{ matrix.bazel_version }}
+
+          if [[ "$version" == latest || "$version" < 7 ]]; then
+            sed -i '/enable_bzlmod/d' .bazelrc
+          fi
 
           bazel build --config=clang-format-fix
-
-          bazel build --config=clang-format
 
   all:
     runs-on: ubuntu-latest
@@ -68,5 +92,6 @@ jobs:
     needs:
       - check-format
       - fix-format
+      - bazel-version
     steps:
     - run: true
