@@ -29,7 +29,7 @@ set -euo pipefail
 # although newer versions of clang-format (e.g. 18.1.4) *do* appear to work
 # with symlinks
 #
-{binary} -style=file:{config} {format_options} $(readlink --canonicalize {infile})
+{binary} -style=file:{config} {format_options} $(readlink -f {infile})
 
 touch {outfile}
 """.format(

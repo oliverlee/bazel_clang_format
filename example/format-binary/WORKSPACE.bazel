@@ -5,30 +5,30 @@ local_repository(
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-BAZEL_TOOLCHAIN_COMMIT = "66f938c956d247d01997ecfc84725f165ceaf1ed"
+TOOLCHAINS_LLVM_COMMIT = "b1a6c86b42ee2373574d0e6862d9d9d5405c3146"
 
 http_archive(
-    name = "com_grail_bazel_toolchain",
-    integrity = "sha256-Gf4ow1hoJKbokzIAiGXv9PskwCR63o9ryKN+CLsaemw=",
+    name = "toolchains_llvm",
+    integrity = "sha256-hdEfwQEvZaPD/gp6A9iDSIxxKOBYrn+ttFYjAHfFby8=",
     strip_prefix = "bazel-toolchain-{commit}".format(
-        commit = BAZEL_TOOLCHAIN_COMMIT,
+        commit = TOOLCHAINS_LLVM_COMMIT,
     ),
     url = "https://github.com/oliverlee/bazel-toolchain/archive/{commit}.tar.gz".format(
-        commit = BAZEL_TOOLCHAIN_COMMIT,
+        commit = TOOLCHAINS_LLVM_COMMIT,
     ),
 )
 
-load("@com_grail_bazel_toolchain//toolchain:deps.bzl", "bazel_toolchain_dependencies")
+load("@toolchains_llvm//toolchain:deps.bzl", "bazel_toolchain_dependencies")
 
 bazel_toolchain_dependencies()
 
-load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
+load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 llvm_toolchain(
-    name = "llvm14",
-    llvm_version = "14.0.0",
+    name = "llvm18",
+    llvm_version = "18.1.8",
 )
 
-load("@llvm14//:toolchains.bzl", "llvm_register_toolchains")
+load("@llvm18//:toolchains.bzl", "llvm_register_toolchains")
 
 llvm_register_toolchains()
