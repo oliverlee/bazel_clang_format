@@ -10,10 +10,12 @@ on:
 
 jobs:
   check-format:
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
         include:
           - example: default
             errors: 3
@@ -23,11 +25,12 @@ jobs:
             errors: 1
           - example: format-ignore
             errors: 0
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - shell: bash
         run: |
-          set -x
+          set -euxo pipefail
 
           cd example/${{ matrix.example }}
 
@@ -86,12 +89,16 @@ jobs:
 
           bazel build --config=clang-format-fix
 
+  # https://emmer.dev/blog/skippable-github-status-checks-aren-t-really-required/
+  # https://github.com/marketplace/actions/alls-green
   all:
     runs-on: ubuntu-latest
-    if: ${{ github.base_ref == 'main' }}
+    if: always()
     needs:
       - check-format
       - fix-format
       - bazel-version
     steps:
-    - run: true
+    - uses: re-actors/alls-green@release/v1
+      with:
+        jobs: ${{ toJSON(needs) }}
