@@ -6,9 +6,28 @@ Run `clang-format` on Bazel C++ targets directly. It's like
 
 ## usage
 
-Update your project with
+<details open><summary>MODULE</summary>
 
-```Starlark
+```starlark
+# //:.bazelrc
+common --registry=https://raw.githubusercontent.com/digiboys/bazel-registry/main
+common --registry=https://bcr.bazel.build
+```
+
+```starlark
+# //:MODULE.bazel
+bazel_dep(
+    name = "bazel_clang_format",
+    version = "0.0.0",
+    dev_dependency = True
+)
+```
+
+</details>
+
+<details><summary>WORKSPACE</summary>
+
+```starlark
 # //:WORKSPACE.bazel
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_repository")
 
@@ -26,7 +45,10 @@ http_repository(
 )
 ```
 
-```Starlark
+</details>
+
+
+```starlark
 # //:.bazelrc
 build:clang-format --aspects=@bazel_clang_format//:defs.bzl%check_aspect
 build:clang-format --output_groups=report
