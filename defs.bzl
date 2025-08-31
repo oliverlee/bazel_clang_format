@@ -41,6 +41,7 @@ touch {outfile}
         ),
         mnemonic = "ClangFormat",
         progress_message = "Formatting {}".format(f.short_path),
+        use_default_shell_env = True,
         execution_requirements = execution_reqs,
     )
 
