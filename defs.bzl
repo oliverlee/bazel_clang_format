@@ -2,6 +2,8 @@
 clang-format aspect
 """
 
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+
 def _source_files_in(ctx, attr):
     if not hasattr(ctx.rule.attr, attr):
         return []
